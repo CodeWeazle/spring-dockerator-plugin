@@ -10,6 +10,10 @@ packaged, so that a cleanup procedure can remove all annotations from the proper
 archive. Be ware that *only packaged properties/yml files are being cleaned*. This does not happen for the _config_ directory
 for instance, since this is not copied into the _target_ directory and thus included in the archive (by default).
 
+It might be important to mention that this plugin only create the docker-compose file from information taken from the project,
+it does NOT create a Dockerfile or even a docker image. This remains the responsibility of the developer.
+
+
 [^comment]:
 	As a comment counts a line of which the first non-space charachter is '#'.
   
@@ -173,6 +177,66 @@ An example for a single-module docker-compose file could look like this:
 
 ```
 
+## Multi module projects
+
+In multi-module projects, the plugin will iterate over all module sub-directories and collect the necessary information
+from the properties/yml files for the profiles specified using the directories from the plugin configuration.
+
+For the time being this means, for the docker-compose file to be created all runnable[^runnable] sub-modules need to use
+the same profiles. Differing profile configurations can be configured in the pom.xml module configuration of the sub-module.
+This will also create a docker-compose file within this submodule.
+
+*Remark:* It is recommended to put the _outputDir_ into the target directory, so that possibly existing files in your source
+		  branch will not be overwritten.
+		  
+
+The plugin seeks to collect all common properties[^common] and list them in a common anchor in the docker-compose file.
+
+This anchor is then used in all of the service entries to make these common variables available to them. This implies a 
+slightly different format for the environment variables than in the single-module project. 
+
+ 
+```
+name: demo-system
+x-demo-system-common:
+    &demo-system-common
+    environment:
+      &demo-system-env
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
+      SPRING_DATASOURCE_NAME: demo-application
+      SPRING_DATASOURCE_PASSWORD: demoapp
+      SPRING_DATASOURCE_PLATFORM: postgresql
+      SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/demoapp
+      SPRING_DATASOURCE_USERNAME: demoapp
+      SPRING_PROFILES_ACTIVE: demo,postgres,sba
+services:
+  demo-backend:
+    <<: *demo-system-common
+    image: nexus.magiccode.net:8891/demo/demo-backend:2.9.6-SNAPSHOT
+    environment:
+      <<: *demo-system-env
+      LOGGING_LEVEL_NET_MAGICCODE: DEBUG
+      SERVER_PORT: 8080
+    ports:
+      - "8080:8080"
+  demo-frontend:
+    <<: *demo-system-common
+    image: nexus.magiccode.net:8891/demo/demo-frontend:2.9.6-SNAPSHOT
+    environment:
+      <<: *demo-system-env
+      SERVER_ADDRESS: 0.0.0.0
+      SERVER_PORT: 9080
+      SPRING_CLOUD_CONSUL_CONFIG_ENABLED: false
+      UPLOAD_FILES_DIRECTORY: ~/import
+    ports:
+      - "9080:9080"
+
+```
 
 
+[^common]:
+	Common properties are those, which 
+	- have the same key AND value in ALL sub-modules they appear in
+	- appear in properties files of at least two sub-modules
 	
+
