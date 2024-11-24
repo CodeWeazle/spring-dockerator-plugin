@@ -126,8 +126,8 @@ public class ComposeFileGenerator {
 				: Paths.get(outputDir, "docker-compose-" + moduleName + "-" + activeProfile + ".yml");
 		
 	    try (BufferedWriter writer = Files.newBufferedWriter(moduleComposeFile)) {
-	    	writer.write("name: " + moduleName+ "\n");
 	    	writer.write(generateCommentSection(activeProfile, moduleName));
+	    	writer.write("name: " + moduleName+ "\n");
 	        writer.write("services:\n");
 	        writer.write(services.stream().filter(service->service.getName().equals(moduleName))
 	        		                      .findFirst()
