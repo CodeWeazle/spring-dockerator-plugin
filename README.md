@@ -2,6 +2,17 @@
 
 The purpose of this plugin is to generate docker-compose files during a builld with maven.
 The generated docker-compose<...>.yml file is generated based on the (spring) profiles defined in the plugin configuration.
+To expose properties as environment variables to the docker-compose file, these can be annotated by a preceding comment[^comment] 
+containing the tag _DockerInclude_ 
+
+The default plugin life-cycle phase is _prepare-package_. This makes sure all code has been compiled and tested but not yet 
+packaged, so that a cleanup procedure can remove all annotations from the properties files before they end up in the created
+archive. Be ware that *only packaged properties/yml files are being cleaned*. This does not happen for the _config_ directory
+for instance, since this is not copied into the _target_ directory and thus included in the archive (by default).
+
+[^comment]:
+  As a comment counts a line of which the first non-space charachter is '#'.
+  
 
 ## Requirements
 
@@ -74,7 +85,8 @@ Without any configuration, the plugin will not do very much.
 
 | Option         | Desription                       | example                                                |
 | ------         | -----------------                | ------------------------                               |
-| outputDir      | <p> The directory the docker-compose files will be created in. Defaults to __${project.basedir}__, but should be changed to not overwrite your files if you already have this directory.| <outputDir>${project.basedir}/target/docker</outputDir>|
+| outputDir      | The directory the docker-compose files will be created in. Defaults to __${project.basedir}__, but should be changed to not overwrite your files if you already have this directory.| <outputDir>${project.basedir}/target/docker</outputDir>|
+| imagePrefix    | A prefix to be added in front of the generated image name.| \<imagePrefix\>nexus.magiccode.net:8891/plugins/\</imagePrefix\>|
 | profiles       | List of profile names which the profiles (ie. properties/yaml files) parsed for generation |\<profiles\><br/>&nbsp;&nbsp;\<profile\>demo\</profile\><br/>&nbsp;&nbsp;<profile\>postgres\</profile\><br/>\</profiles\>|
 | propertiesDirs | List of directories to scan for the properies/yml files.|\<propertiesDirs\><br/>&nbsp;&nbsp;\<propertiesDir\>src/main/resources\</propertiesDir\><br/>&nbsp;&nbsp;\<propertiesDir\>config\</propertiesDir\><br/>\</propertiesDirs\> |
 | skipModules    | The code only recognises runnable modules in multi-module projects[^runnable]. To explicitely exclude modules, list them here.|\<skipModules\><br/>&nbsp;&nbsp;\<skipModule\>demo-core\</skipModule\><br/>&nbsp;&nbsp;\<skipModule\>demo-common\</skipModule\><br/>\</skipModules\>|
@@ -112,6 +124,7 @@ Without any configuration, the plugin will not do very much.
 					<profile>sba</profile>
 				</profiles>
 				<outputDir>${project.basedir}/target/docker</outputDir>
+				<imagePrefix>nexus.magiccode.net:8891/plugins/</imagePrefix>
 			</configuration>
 		</plugin>
       </build>
@@ -126,5 +139,19 @@ Without any configuration, the plugin will not do very much.
 	purposes. These modules (the name of their sub-directories inside the project) can be listed 
 	here for an explicit exclusion.
 	 
-	
+## Single module projects
+
+The usage in a single-module project is quite straight forward. The plugin parses the properties and yml files for the given profiles (as well as the default application.properties/application.yml) for lines preceeded by a comment containing teh tag _DockerInclude_.
+These will be formatted and added to the _environment_ section for the docker service. 
+
+The name of the service will be the name of the project. The name of the image is formed like this
+
+   ```<imagePrefix>${project.name}:${project.version}```
+    
+where the imagePrefix is taken from the plugin configuration and ${project.name} as well as ${project.version} from the pom.xml file of the project. 
+ 
+
+
+
+
 	
