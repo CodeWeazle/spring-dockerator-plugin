@@ -5,7 +5,7 @@
 
 	<groupId>net.magiccode.maven</groupId>
 	<artifactId>spring-dockerator-plugin</artifactId>
-	<version>0.0.2</version>
+	<version>0.0.3-SNAPSHOT</version>
 	<packaging>maven-plugin</packaging>
 
 	<name>Docker Compose Maven Plugin</name>
@@ -42,14 +42,6 @@
 			<organizationUrl>http://www.magiccode.net</organizationUrl>
 		</developer>
 	</developers>
-
-	<scm>
-		<connection>
-			scm:git:git://github.com/magiccode/spring-dockerator-plugin.git</connection>
-		<developerConnection>
-			scm:git:ssh://github.com/magiccode/spring-dockerator-plugin.git</developerConnection>
-		<url>http://github.com/magiccode/spring-dockerator-plugin</url>
-	</scm>
 
 	<dependencies>
 		<!-- Dependency for YAML processing -->
@@ -172,7 +164,88 @@
 				</configuration>
 			</plugin>
 
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-source-plugin</artifactId>
+				<version>3.3.0</version>
+				<executions>
+					<execution>
+						<id>attach-sources</id>
+						<phase>verify</phase>
+						<goals>
+							<goal>jar-no-fork</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+
+			<plugin>
+				<groupId>org.projectlombok</groupId>
+				<artifactId>lombok-maven-plugin</artifactId>
+				<version>1.18.20.0</version>
+				<configuration>
+					<sourceDirectory>${project.basedir}/src/main/java</sourceDirectory>
+					<outputDirectory>${delombok.output}</outputDirectory>
+					<addOutputDirectory>false</addOutputDirectory>
+					<encoding>${project.build.sourceEncoding}</encoding>
+				</configuration>
+				<executions>
+					<execution>
+						<phase>generate-sources</phase>
+						<goals>
+							<goal>delombok</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-javadoc-plugin</artifactId>
+				<version>3.6.0</version>
+				<configuration>
+					<show>public</show>
+					<nohelp>true</nohelp>
+					<sourcepath>${delombok.output}</sourcepath>
+				</configuration>
+				<executions>
+					<execution>
+						<id>javadoc-jar</id>
+						<phase>package</phase>
+						<goals>
+							<goal>jar</goal>
+						</goals>
+						<configuration>
+							<!-- switch on dependency-driven aggregation -->
+							<includeDependencySources>true</includeDependencySources>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
 		</plugins>
 	</build>
+
+	<reporting>
+		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-javadoc-plugin</artifactId>
+				<version>3.6.0</version>
+				<configuration>
+					<stylesheetfile>${basedir}/src/main/javadoc/stylesheet.css</stylesheetfile>
+					<show>public</show>
+				</configuration>
+			</plugin>
+		</plugins>
+	</reporting>
+
+	<scm>
+		<connection>
+			scm:git:git://github.com/CodeWeazle/spring-dockerator-plugin.git</connection>
+		<developerConnection>
+			scm:git:ssh://github.com:CodeWeazle/spring-dockerator-plugin.git</developerConnection>
+		<url>https://maven.pkg.github.com/CodeWeazle/spring-dockerator-plugin</url>
+	</scm>
+
 
 </project>
