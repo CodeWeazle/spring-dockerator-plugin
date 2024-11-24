@@ -11,7 +11,7 @@ archive. Be ware that *only packaged properties/yml files are being cleaned*. Th
 for instance, since this is not copied into the _target_ directory and thus included in the archive (by default).
 
 [^comment]:
-  As a comment counts a line of which the first non-space charachter is '#'.
+	As a comment counts a line of which the first non-space charachter is '#'.
   
 
 ## Requirements
