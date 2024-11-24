@@ -10,7 +10,7 @@ packaged, so that a cleanup procedure can remove all annotations from the proper
 archive. Be ware that *only packaged properties/yml files are being cleaned*. This does not happen for the _config_ directory
 for instance, since this is not copied into the _target_ directory and thus included in the archive (by default).
 
-It might be important to mention that this plugin only create the docker-compose file from information taken from the project,
+It might be important to mention that this plugin only creates the docker-compose file from information taken from the project,
 it does NOT create a Dockerfile or even a docker image. This remains the responsibility of the developer.
 
 
@@ -107,7 +107,6 @@ Without any configuration, the plugin will not do very much.
 			<version>0.0.2</version>
 			<executions>
 				<execution>
-					<!-- <phase>package</phase> --><!-- needed no longer -->
 					<goals>
 						<goal>generate-docker-compose</goal>
 					</goals>
