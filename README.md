@@ -246,7 +246,7 @@ services:
 
 ## Build-profiles
 
-If a build profile is used (mvn -P <profile>) and this profile has the spring-dockerator-plugin configured,
+If a build profile is used (mvn -P \<profile\>) and this profile has the spring-dockerator-plugin configured,
 the docker compose files generated will have the profile name added as in the pattern docker-compose-<profile>.yml
 
 This allows to use different configurations and profiles for certain environments like user acceptance testing etc.
