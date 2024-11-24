@@ -201,8 +201,6 @@ The plugin seeks to collect all common properties[^common] and list them in a co
 This anchor is then used in all of the service entries to make these common variables available to them. This implies a 
 slightly different format for the environment variables than in the single-module project. 
 
-
-
  
 ```
 name: demo-system
@@ -238,13 +236,18 @@ services:
       UPLOAD_FILES_DIRECTORY: ~/import
     ports:
       - "9080:9080"
-
 ```
 
-
 [^common]:
-	Common properties are those, which 
-	- have the same key AND value in ALL sub-modules they appear in
+	Common properties are those, which
+	- have the same key AND value in ALL sub-modules they appear in	
 	- appear in properties files of at least two sub-modules
 	
 
+## Build-profiles
+
+If a build profile is used (mvn -P <profile>) and this profile has the spring-dockerator-plugin configured,
+the docker compose files generated will have the profile name added as in the pattern docker-compose-<profile>.yml
+
+This allows to use different configurations and profiles for certain environments like user acceptance testing etc.
+ 
