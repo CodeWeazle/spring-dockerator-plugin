@@ -186,6 +186,12 @@ For the time being this means, for the docker-compose file to be created all run
 the same profiles. Differing profile configurations can be configured in the pom.xml module configuration of the sub-module.
 This will also create a docker-compose file within this submodule.
 
+Just like in the single-module case, the name of the image, in this case for the sub-module, is derived from the name of the 
+sub-module, i.e. the name of the sub-directory of the parent project. Also, the project-version is taken from the pom.xml of 
+the parent project!
+
+   ```<imagePrefix><module-name>:${project.version}```
+
 *Remark:* It is recommended to put the _outputDir_ into the target directory, so that possibly existing files in your source
 		  branch will not be overwritten.
 		  
@@ -194,6 +200,8 @@ The plugin seeks to collect all common properties[^common] and list them in a co
 
 This anchor is then used in all of the service entries to make these common variables available to them. This implies a 
 slightly different format for the environment variables than in the single-module project. 
+
+
 
  
 ```
