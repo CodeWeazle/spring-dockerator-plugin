@@ -35,9 +35,9 @@
 
 	<developers>
 		<developer>
-			<id>magicdev</id>
-			<name>Magic Developer</name>
-			<email>developer@magiccode.net</email>
+			<id>CodeWeazle</id>
+			<name>Volker Karlmeier</name>
+			<email>volker@magiccode.net</email>
 			<organization>MagicCode</organization>
 			<organizationUrl>http://www.magiccode.net</organizationUrl>
 		</developer>
