@@ -135,7 +135,7 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-gpg-plugin</artifactId>
-				<version>3.1.0</version>
+				<version>3.2.7</version>
 				<configuration>
 					<keyname>CDB4C379E59BDB0637A37786E38088ACA8297A36</keyname>
 					<passphraseServerId>CDB4C379E59BDB0637A37786E38088ACA8297A36</passphraseServerId>
