@@ -150,7 +150,28 @@ The name of the service will be the name of the project. The name of the image i
     
 where the imagePrefix is taken from the plugin configuration and ${project.name} as well as ${project.version} from the pom.xml file of the project. 
  
+An example for a single-module docker-compose file could look like this:
+```
+	name: demo-application
+	services:
+	  demo-application:
+	    image: nexus.magiccode.net:8891/demo/demo-application:2.9.6-SNAPSHOT
+	    environment:
+	      - SPRING_DATASOURCE_DRIVER_CLASS_NAME=org.postgresql.Driver
+	      - SPRING_MANAGEMENT_DATASOURCE_NAME=demo
+	      - SPRING_MANAGEMENT_DATASOURCE_PASSWORD=demoapp
+	      - SPRING_MANAGEMENT_DATASOURCE_PLATFORM=postgresql
+	      - SPRING_MANAGEMENT_DATASOURCE_URL=jdbc:postgresql://localhost:5432/demoapp
+	      - SPRING_MANAGEMENT_DATASOURCE_USERNAME=demoapp
+	      - SERVER_ADDRESS=0.0.0.0
+	      - SERVER_PORT=9080
+	      - SPRING_CLOUD_CONSUL_CONFIG_ENABLED=false
+	      - SPRING_PROFILES_ACTIVE=demo,postgres,sba
+	      - UPLOAD_FILES_DIRECTORY=~/import
+	    ports:
+	      - "9080:9080"
 
+```
 
 
 
