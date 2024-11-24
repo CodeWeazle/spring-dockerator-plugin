@@ -32,6 +32,10 @@ import net.magiccode.maven.docker.ComposeFileGenerator;
 import net.magiccode.maven.docker.DockerService;
 import net.magiccode.maven.util.ModuleHelper;
 
+/**
+ * Mojo implementation for generating docker compose files during build.
+ * 
+ */
 @Mojo(name = "generate-docker-compose", defaultPhase = LifecyclePhase.PREPARE_PACKAGE)
 
 @Log4j2

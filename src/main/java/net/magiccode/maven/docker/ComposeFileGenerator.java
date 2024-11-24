@@ -21,6 +21,10 @@ import org.apache.commons.lang3.StringUtils;
 import lombok.Builder;
 import lombok.extern.log4j.Log4j2;
 
+/**
+ * Generates docker compose files for project and modules.
+ * Uses Lombok @Builder annotation
+ */
 @Log4j2
 @Builder
 public class ComposeFileGenerator {
@@ -60,7 +64,7 @@ public class ComposeFileGenerator {
 	
 	/**
 	 * Creates a docker-compose file 
-	 * @throws IOException
+	 * @throws IOException if there is an issue writing the docker-compose file
 	 */
 	public void generateDockerCompose() throws IOException {
 		
@@ -113,11 +117,7 @@ public class ComposeFileGenerator {
 	/**
 	 * generates a docker compose file for a single module
 	 * 
-	 * @param serviceName
-	 * @param outputDir
-	 * @param envVars
-	 * @param ports
-	 * @throws IOException
+	 * @throws IOException if there is an issue writing the docker-compose file
 	 */
 	public void generateModuleDockerCompose() throws IOException {
 
