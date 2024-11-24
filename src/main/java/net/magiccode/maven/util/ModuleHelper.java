@@ -20,7 +20,7 @@ import lombok.Builder;
 import lombok.Data;
 
 /**
- * 
+ * Helper class for module handling
  */
 @Builder
 @Data
@@ -33,7 +33,7 @@ public class ModuleHelper {
 	 * 
 	 * @return all sub-directories of the given project that contain a file with the
 	 *         name pom.xml
-	 * @throws MojoExecutionException
+	 * @throws MojoExecutionException if something goes wrong, like a missin gparent pom.
 	 */
 	public List<File> getModules() throws MojoExecutionException {
 		List<File> modules = new ArrayList<>();
@@ -75,11 +75,11 @@ public class ModuleHelper {
 	/**
 	 * returns whether or not a module is 'runnable'. This method returns true if
 	 * any java file in src/main/java (or a subdirectory of this) either contains a
-	 * <i>main</i> method or a <i>@SpringBootApplication</i<> annotation.
+	 * <i>main</i> method or a <i>@SpringBootApplication</i> annotation.
 	 * 
 	 * @param moduleDir - the directory of the module for the project
 	 * @return true|false
-	 * @throws MojoExecutionException
+	 * @throws MojoExecutionException if something goes wrong, like a missin gparent pom.
 	 */
 	public boolean isRunnableModule(File moduleDir) throws MojoExecutionException {
 		Path mainJavaDir = moduleDir.toPath().resolve("src/main/java");

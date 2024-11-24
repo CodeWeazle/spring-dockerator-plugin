@@ -18,9 +18,8 @@ import lombok.Data;
 import lombok.extern.log4j.Log4j2;
 
 /**
- * 
+ * Container for the services created for each module. 
  */
-
 @Data
 @Builder
 @Log4j2
@@ -57,10 +56,11 @@ public class DockerService {
 	 * creates a string in yaml format for the docker-compose file to be generated. If commonName and commonEnvironmentName 
 	 * are specified (not empty nor null) a common property entry is generated, otherwise a single module entry.
 	 * (Single modules entries start with '- ' and use '=' for a delimiter, common property entries do not start with '- ' 
-	 * and delimit entries with ':' 
-	 * @param commonName
-	 * @param commonEnvironmentName
-	 * @return
+	 * and delimit entries with ':'
+	 *  
+	 * @param commonName - a common name for all common settings in the docker compose file.
+	 * @param commonEnvironmentName - a common environment name used for the anchor of the environment settings
+	 * @return a string containing the entire service definition for the docker compose file.
 	 */
 	public String generateServiceEntry(String commonName, String commonEnvironmentName) {
 	    StringBuilder serviceEntry = new StringBuilder();
