@@ -115,7 +115,7 @@
 				<artifactId>maven-plugin-plugin</artifactId>
 				<version>3.9.0</version>
 				<configuration>
-					<goalPrefix>docker-compose</goalPrefix>
+					<goalPrefix>spring-dockerator</goalPrefix>
 				</configuration>
 				<executions>
 					<execution>
