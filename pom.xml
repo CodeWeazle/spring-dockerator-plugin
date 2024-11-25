@@ -9,7 +9,7 @@
 
 	<name>Spring Dockerator Plugin</name>
 	<description>A Maven plugin to generate Docker Compose files for Spring Boot
-		applications.</description>
+		applications. </description>
 	<url>http://www.magiccode.net</url>
 
 	<properties>
