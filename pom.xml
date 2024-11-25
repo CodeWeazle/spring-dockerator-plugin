@@ -4,7 +4,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>net.magiccode.maven</groupId>
 	<artifactId>spring-dockerator-plugin</artifactId>
-	<version>0.0.2</version>
+	<version>0.0.r-SNAPSHOT</version>
 	<packaging>maven-plugin</packaging>
 
 	<name>Spring Dockerator Plugin</name>
@@ -229,7 +229,6 @@
 							<goal>jar</goal>
 						</goals>
 						<configuration>
-							<!-- switch on dependency-driven aggregation -->
 							<includeDependencySources>true</includeDependencySources>
 						</configuration>
 					</execution>
@@ -259,6 +258,5 @@
 			scm:git:ssh://github.com:CodeWeazle/spring-dockerator-plugin.git</developerConnection>
 		<url>https://maven.pkg.github.com/CodeWeazle/spring-dockerator-plugin</url>
 	</scm>
-
 
 </project>
