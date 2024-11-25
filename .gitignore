@@ -223,3 +223,6 @@ docker/volumes/**
 /build/
 /*.sh
 /output.txt
+
+.github/workflows/maven-*.ym
+
