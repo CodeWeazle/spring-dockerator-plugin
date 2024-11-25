@@ -28,6 +28,8 @@ By the time being, this plugin offers just one goal, which is ```spring-dockerat
 
 ## Usage
 
+### Maven
+
 To add this plugin to your project, just follow the usual pattern for maven plugins.
 
 ```
@@ -82,6 +84,16 @@ To add this plugin to your project, just follow the usual pattern for maven plug
       ...
     </project>
 ```	
+
+
+
+The version shown is related to the *release* branch, which is also available on the [maven-central repository](https://central.sonatype.com/artifact/net.magiccode.maven/spring-dockerator-plugin/overview).
+
+
+### Others
+
+For other build systems please consult the current [maven-central site](https://central.sonatype.com/artifact/net.magiccode/kilauea)
+
 
 ## Configuration
 
