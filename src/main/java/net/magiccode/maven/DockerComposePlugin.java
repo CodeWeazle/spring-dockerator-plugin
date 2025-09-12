@@ -30,6 +30,7 @@ import org.yaml.snakeyaml.Yaml;
 import lombok.extern.log4j.Log4j2;
 import net.magiccode.maven.docker.ComposeFileGenerator;
 import net.magiccode.maven.docker.DockerService;
+import net.magiccode.maven.util.EnvironmentHelper;
 import net.magiccode.maven.util.ModuleHelper;
 
 /**
@@ -58,6 +59,9 @@ public class DockerComposePlugin extends AbstractMojo {
 
 	@Parameter(property = "skipModules")
 	private List<String> skipModules;
+
+	@Parameter(defaultValue = "true", property = "createEnv")
+	private Boolean createEnv;
 
 	@Parameter(defaultValue = "${project.basedir}/docker", property = "outputDir")
 	private String outputDir;
@@ -110,7 +114,7 @@ public class DockerComposePlugin extends AbstractMojo {
 				if (!services.isEmpty()) {
 					ComposeFileGenerator composeFileGenerator = ComposeFileGenerator.builder().services(services)
 							.outputDir(outputDir).commonEnvironment(commonEnvironment).moduleName(project.getName())
-							.activeProfile(profile).build();
+							.activeProfile(profile).createEnvironmentFile(createEnv).build();
 					composeFileGenerator.generateDockerCompose();
 				} else {
 					log.warn("No runnable modules found; docker-compose.yml will not be generated.");
@@ -119,6 +123,10 @@ public class DockerComposePlugin extends AbstractMojo {
 				// Generate docker-compose-db.yml for database containers
 				if (!globalJdbcConfigs.isEmpty()) {
 					generateDatabaseCompose(globalJdbcConfigs);
+				}
+				// create .env file if required
+				if (createEnv) {
+					createEnvironmentFile(commonEnvironment, services);
 				}
 
 			} catch (IOException | MojoExecutionException e) {
@@ -222,7 +230,8 @@ public class DockerComposePlugin extends AbstractMojo {
 				DockerService dockerService = generateService(module);
 				services.add(dockerService);
 				ComposeFileGenerator composeFileGenerator = ComposeFileGenerator.builder().outputDir(outputDir)
-						.moduleName(module.getName()).services(services).activeProfile(activeProfile).build();
+						.moduleName(module.getName()).services(services).activeProfile(activeProfile)
+						.createEnvironmentFile(createEnv).build();
 				composeFileGenerator.generateModuleDockerCompose();
 			} else {
 				log.info("Skipping non-runnable module: " + module.getName());
@@ -355,9 +364,15 @@ public class DockerComposePlugin extends AbstractMojo {
 			ports.add("8080");
 		}
 
-		DockerService dockerService = DockerService.builder().name(moduleDirectory.getName()).jdbcConfigs(jdbcConfigs)
-				.ports(ports).dockerEnvVars(formatEnvironmentVariables(dockerEnvVars)).imagePrefix(imagePrefix)
-				.version(project.getVersion()).build();
+		DockerService dockerService = DockerService.builder()
+												   .name(moduleDirectory.getName())
+												   .jdbcConfigs(jdbcConfigs)
+												   .ports(ports)
+												   .dockerEnvVars(formatEnvironmentVariables(dockerEnvVars))
+												   .imagePrefix(imagePrefix)
+												   .version(project.getVersion())
+												   .createEnvironmentFile(createEnv)
+												   .build();
 		return dockerService;
 	}
 
@@ -552,6 +567,46 @@ public class DockerComposePlugin extends AbstractMojo {
 	 */
 	private boolean isLineComment(String line) {
 		return line.stripIndent().startsWith("#");
+	}
+
+	/**
+	 * creates a .env file in the output directory containing all environment
+	 * variables used in the docker-compose file.
+	 * 
+	 * @param commonEnvironment - the map of common environment variables
+	 * @param services          - the list of services to include environment
+	 *                          variables from.
+	 * @return whether or not the file was created successfully.
+	 */
+	private boolean createEnvironmentFile(final Map<String, String> commonEnvironment,
+										  final List<DockerService> services) {
+		Path environmentFile = Paths.get(outputDir, ".env");
+
+		try (BufferedWriter writer = Files.newBufferedWriter(environmentFile)) {
+			StringBuffer commonBuffer = new StringBuffer();
+			commonEnvironment.entrySet().stream().sorted(Map.Entry.comparingByKey())
+					.forEach(entry -> commonBuffer.append(entry.getKey())
+							.append("=")
+							.append(EnvironmentHelper.generateValueEntry(createEnv, entry.getKey(), entry.getValue()))
+							.append("\n"));
+
+			writer.write(commonBuffer.toString());
+
+			for (DockerService service : services) {
+				StringBuffer serviceBuffer = new StringBuffer();
+				service.getDockerEnvVars().entrySet().stream().sorted(Map.Entry.comparingByKey())
+						.forEach(entry -> serviceBuffer.append(EnvironmentHelper.generateNameEntry(true, entry.getKey(), service.getName()))
+								.append("=")
+								.append(EnvironmentHelper.generateValueEntry(false, entry.getKey(), entry.getValue()))
+								.append("\n"));
+				writer.write(serviceBuffer.toString());
+			}
+		} catch (IOException e) {
+			log.error("Error writing .env file", e);
+			return false;
+		}
+		log.info("Generated environment file: " + environmentFile.toString());
+		return true;
 	}
 
 }

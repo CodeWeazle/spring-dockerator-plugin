@@ -16,6 +16,7 @@ import org.apache.commons.lang3.StringUtils;
 import lombok.Builder;
 import lombok.Data;
 import lombok.extern.log4j.Log4j2;
+import net.magiccode.maven.util.EnvironmentHelper;
 
 /**
  * Container for the services created for each module. 
@@ -41,7 +42,8 @@ public class DockerService {
 	@Builder.Default
 	private List<String> ports = new ArrayList<>();
 	
-	
+	@Builder.Default
+	private boolean createEnvironmentFile = false;
 	/**
 	 * wrapper method calling <code>generateServiceEntry(String commonName, String commonEnvironmentName)</code> with
 	 * null values to indicate no common environment is provided and a service entry for a single module project is 
@@ -93,9 +95,7 @@ public class DockerService {
 			.forEach(entry -> serviceEntry.append(StringUtils.repeat(" ", 6))
 										  .append(entry.getKey())
 										  .append(": ")
-										   .append(entry.getValue().contains(" ")
-												   ? "'"+entry.getValue()+"'"					    											   
-												   :entry.getValue())
+										  .append(EnvironmentHelper.generateValueEntry(createEnvironmentFile, entry.getKey(), entry.getValue(), this.getName()))
 										  .append("\n"));
 	    } else {
 		    dockerEnvVars
@@ -103,8 +103,10 @@ public class DockerService {
 			.stream()
 			.sorted(Map.Entry.comparingByKey())
 			.forEach(entry -> serviceEntry.append(StringUtils.repeat(" ", 6))
-										  .append("- ").append(entry.getKey())
-										  .append("=").append(entry.getValue())
+										  .append("- ")
+										  .append(entry.getKey())
+										  .append("=")
+										  .append(EnvironmentHelper.generateValueEntry(createEnvironmentFile, entry.getKey(), entry.getValue(), this.getName()))
 										  .append("\n"));
 
 	    }
