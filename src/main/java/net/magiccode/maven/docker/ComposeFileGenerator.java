@@ -1,6 +1,24 @@
 /**
  * Helper class for generating docker-compose.yml files.
- * 
+ * <p>
+ * This class generates Docker Compose files for projects and modules. It uses the Lombok @Builder annotation.
+ * </p>
+ *
+ * <p>
+ * Example usage:
+ * <pre>
+ *     ComposeFileGenerator generator = ComposeFileGenerator.builder()
+ *         .services(services)
+ *         .outputDir(outputDir)
+ *         .moduleName(moduleName)
+ *         .commonEnvironment(commonEnv)
+ *         .activeProfile(profile)
+ *         .createEnvironmentFile(true)
+ *         .build();
+ *     generator.generateDockerCompose();
+ * </pre>
+ * </p>
+ *
  * @author Volker Karlmeier
  *  
  */
@@ -20,6 +38,7 @@ import org.apache.commons.lang3.StringUtils;
 
 import lombok.Builder;
 import lombok.extern.log4j.Log4j2;
+import net.magiccode.maven.util.EnvironmentHelper;
 
 /**
  * Generates docker compose files for project and modules.
@@ -30,40 +49,49 @@ import lombok.extern.log4j.Log4j2;
 public class ComposeFileGenerator {
 
 	/**
-	 * List of DockerServcie instances to be included in this docker compose file.
-	 * In multi-module projects each runnable project creates one service entry.,
-	 * A module is identified as runnable if it contains a class with a main method 
-	 * or one with a @SpringBootApplication annotation. 
+	 * List of DockerService instances to be included in this docker compose file.
+	 * In multi-module projects, each runnable project creates one service entry.
+	 * A module is identified as runnable if it contains a class with a main method
+	 * or one with a @SpringBootApplication annotation.
 	 */
 	private List<DockerService> services;
 	
 	/** 
-	 * The output directory for the generated docker compose file
+	 * The output directory for the generated docker compose file.
 	 */
 	private String outputDir; 
 	
 	/**
 	 * The name of the module the file is being created for. In multi-module projects this
-	 * is the name of parent project. ${project.name}
+	 * is the name of the parent project. Usually corresponds to ${project.name}.
 	 */
 	private String moduleName;
 	
 	/**
 	 * A map containing properties which are common to at least 2 runnable modules. For being a
-	 * common property, it needs to be 
-	 * - either missing or equal in key AND value in all modules/services
-	 * - occur in more than one module/service
+	 * common property, it needs to be:
+	 * <ul>
+	 *   <li>either missing or equal in key AND value in all modules/services</li>
+	 *   <li>occur in more than one module/service</li>
+	 * </ul>
 	 */
 	private Map<String,String> commonEnvironment; 
 	
 	/**
-	 * the active maven profile. This can have different profile out output settings or whatever,
+	 * The active maven profile. This can have different profile output settings or whatever,
 	 * so if this is neither null nor empty, we add a suffix to the generated filename.
 	 */
 	private String activeProfile;
 	
 	/**
-	 * Creates a docker-compose file 
+	 * If set to true, an .env file will be created in the output directory containing
+	 * all environment variables used in the docker-compose file.
+	 */
+	private boolean createEnvironmentFile;
+	
+	/**
+	 * Creates a docker-compose file for the project or module.
+	 *
 	 * @throws IOException if there is an issue writing the docker-compose file
 	 */
 	public void generateDockerCompose() throws IOException {
@@ -71,9 +99,8 @@ public class ComposeFileGenerator {
 		Path dockerComposeFile = StringUtils.isBlank(activeProfile)  
 						? Paths.get(outputDir, "docker-compose.yml")
 						: Paths.get(outputDir, "docker-compose-"+activeProfile+".yml");
-		
-	 	try (BufferedWriter writer = Files.newBufferedWriter(dockerComposeFile)) {
-	 		
+						
+	 	try (BufferedWriter writer = Files.newBufferedWriter(dockerComposeFile)) {	 		
 	 		writer.write(generateCommentSection(activeProfile, moduleName)); 		
 	 		writer.write("name: " + moduleName+ "\n");
 	 		boolean containsCommonEnvironment = (commonEnvironment!=null && ! commonEnvironment.isEmpty());
@@ -98,9 +125,7 @@ public class ComposeFileGenerator {
 					    		 .forEach(entry -> commonBuffer.append(StringUtils.repeat(" ", 6))
 					    							  		   .append(entry.getKey())
 					    									   .append(": ")
-					    									   .append(entry.getValue().contains(" ")
-					    											   ? "'"+entry.getValue()+"'"					    											   
-					    											   :entry.getValue())
+					    									   .append(EnvironmentHelper.generateValueEntry(createEnvironmentFile, entry.getKey(), entry.getValue()))
 					    									   .append("\n"));
 	 			
 	 			writer.write(commonBuffer.toString());
@@ -114,9 +139,10 @@ public class ComposeFileGenerator {
 		log.info("Generated Docker Compose file: " + dockerComposeFile.toString());
 	}
 	
+	
 	/**
-	 * generates a docker compose file for a single module
-	 * 
+	 * Generates a docker compose file for a single module.
+	 *
 	 * @throws IOException if there is an issue writing the docker-compose file
 	 */
 	public void generateModuleDockerCompose() throws IOException {
@@ -139,10 +165,11 @@ public class ComposeFileGenerator {
 	
 	
 	/**
-	 * generate comment section for docker compose file
-	 * @param activeProfile - the profile the file is generated for
-	 * @param moduleName - the name of the module or system(name of topmost module in multi-module projects)
-	 * @return A string containing the comment section 
+	 * Generates a comment section for the docker compose file.
+	 *
+	 * @param activeProfile the profile the file is generated for
+	 * @param moduleName the name of the module or system (name of topmost module in multi-module projects)
+	 * @return A string containing the comment section
 	 */
 	private String generateCommentSection(String activeProfile, String moduleName) {
 		DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy @ HH:mm:ss");

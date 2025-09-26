@@ -40,7 +40,7 @@ To add this plugin to your project, just follow the usual pattern for maven plug
 	        <plugin>
 			  <groupId>net.magiccode.maven</groupId>
 			  <artifactId>spring-dockerator-plugin</artifactId>
-			  <version>0.0.4</version>
+			  <version>0.0.5</version>
 	          <configuration>
 	            <!-- put your configurations here -->
 	          </configuration>
@@ -59,7 +59,7 @@ To add this plugin to your project, just follow the usual pattern for maven plug
 		<plugin>
 			<groupId>net.magiccode.maven</groupId>
 			<artifactId>spring-dockerator-plugin</artifactId>
-			<version>0.0.4</version>
+			<version>0.0.5</version>
 			<executions>
 				<execution>
 					<goals>
@@ -106,6 +106,7 @@ Without any configuration, the plugin will not do very much.
 | profiles       | List of profile names which the profiles (ie. properties/yaml files) parsed for generation |\<profiles\><br/>&nbsp;&nbsp;\<profile\>demo\</profile\><br/>&nbsp;&nbsp;<profile\>postgres\</profile\><br/>\</profiles\>|
 | propertiesDirs | List of directories to scan for the properies/yml files.|\<propertiesDirs\><br/>&nbsp;&nbsp;\<propertiesDir\>src/main/resources\</propertiesDir\><br/>&nbsp;&nbsp;\<propertiesDir\>config\</propertiesDir\><br/>\</propertiesDirs\> |
 | skipModules    | The code only recognises runnable modules in multi-module projects[^runnable]. To explicitely exclude modules, list them here.|\<skipModules\><br/>&nbsp;&nbsp;\<skipModule\>demo-core\</skipModule\><br/>&nbsp;&nbsp;\<skipModule\>demo-common\</skipModule\><br/>\</skipModules\>|
+| createEnv      | Create an environment file .env instead of adding variable values directly to the docker-compose file|\<createEnv\><br/>true<br/>\</createEnv\>|
 
 
 ### Example
@@ -125,6 +126,7 @@ Without any configuration, the plugin will not do very much.
 				</execution>
 			</executions>
 			<configuration>
+				<createEnv>true</createEnv>
 				<skipModules>
 					<skipModule>demo-core</skipModule>
 					<skipModule>demo-common</skipModule>
