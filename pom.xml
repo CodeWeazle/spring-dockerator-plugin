@@ -4,7 +4,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>net.magiccode.maven</groupId>
 	<artifactId>spring-dockerator-plugin</artifactId>
-	<version>0.0.4</version>
+	<version>0.0.5</version>
 	<packaging>maven-plugin</packaging>
 
 	<name>Spring Dockerator Plugin</name>
@@ -220,6 +220,11 @@
 					<sourcepath>${delombok.output}</sourcepath>
 					<failOnError>false</failOnError>
 					<excludePackageNames>lombok*:lombok.experimental*</excludePackageNames>
+					<dependencySourceExcludes>
+					<!-- exclude Lombok's source jar -->
+					      <dependencySourceExclude>org.projectlombok:lombok</dependencySourceExclude>
+				              <dependencySourceExclude>org.projectlombok:*</dependencySourceExclude>
+                                        </dependencySourceExcludes>
 				</configuration>
 				<executions>
 					<execution>
