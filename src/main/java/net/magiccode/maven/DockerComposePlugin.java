@@ -587,7 +587,7 @@ public class DockerComposePlugin extends AbstractMojo {
 			commonEnvironment.entrySet().stream().sorted(Map.Entry.comparingByKey())
 					.forEach(entry -> commonBuffer.append(entry.getKey())
 							.append("=")
-							.append(EnvironmentHelper.generateValueEntry(createEnv, entry.getKey(), entry.getValue()))
+							.append(EnvironmentHelper.generateValueEntry(false, entry.getKey(), entry.getValue()))
 							.append("\n"));
 
 			writer.write(commonBuffer.toString());
