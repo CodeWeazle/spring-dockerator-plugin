@@ -1,0 +1,17 @@
+############################################################
+# 
+# docker-compose file for Spring Dockerator Plugin
+# 
+# generated on 27/09/2025 @ 20:44:04 using spring-dockerator-plugin.
+# 
+############################################################
+
+name: Spring Dockerator Plugin
+services:
+  spring-dockerator-plugin:
+    image: nexus.riskcontrollimited.com:8891/rcl/spring-dockerator-plugin:0.0.6-SNAPSHOT
+    environment:
+      - SERVER_PORT=${SPRING-DOCKERATOR-PLUGIN_SERVER_PORT}
+      - SPRING_PROFILES_ACTIVE=${SPRING-DOCKERATOR-PLUGIN_SPRING_PROFILES_ACTIVE}
+    ports:
+      - "8080:8080"

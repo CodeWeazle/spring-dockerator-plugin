@@ -107,6 +107,7 @@ Without any configuration, the plugin will not do very much.
 | propertiesDirs | List of directories to scan for the properies/yml files.|\<propertiesDirs\><br/>&nbsp;&nbsp;\<propertiesDir\>src/main/resources\</propertiesDir\><br/>&nbsp;&nbsp;\<propertiesDir\>config\</propertiesDir\><br/>\</propertiesDirs\> |
 | skipModules    | The code only recognises runnable modules in multi-module projects[^runnable]. To explicitely exclude modules, list them here.|\<skipModules\><br/>&nbsp;&nbsp;\<skipModule\>demo-core\</skipModule\><br/>&nbsp;&nbsp;\<skipModule\>demo-common\</skipModule\><br/>\</skipModules\>|
 | createEnv      | Create an environment file .env instead of adding variable values directly to the docker-compose file|\<createEnv\><br/>true<br/>\</createEnv\>|
+| volumes        | Define volume mappings between host and container paths for Docker services|\<volumes\><br/>&nbsp;&nbsp;\<volume\><br/>&nbsp;&nbsp;&nbsp;&nbsp;\<external\>../ssl\</external\><br/>&nbsp;&nbsp;&nbsp;&nbsp;\<internal\>/opt/ssl\</internal\><br/>&nbsp;&nbsp;\</volume\><br/>\</volumes\>|
 
 
 ### Example
@@ -131,6 +132,16 @@ Without any configuration, the plugin will not do very much.
 					<skipModule>demo-core</skipModule>
 					<skipModule>demo-common</skipModule>
 				</skipModules>
+				<volumes>
+					<volume>
+						<external>../ssl</external>
+						<internal>/opt/ssl</internal>
+					</volume>
+					<volume>
+						<external>./data</external>
+						<internal>/var/data</internal>
+					</volume>
+				</volumes>
 				<propertiesDirs>
 					<propertiesDir>src/main/resources</propertiesDir>
 					<propertiesDir>config</propertiesDir>
@@ -185,6 +196,9 @@ An example for a single-module docker-compose file could look like this:
 	      - SPRING_CLOUD_CONSUL_CONFIG_ENABLED=false
 	      - SPRING_PROFILES_ACTIVE=demo,postgres,sba
 	      - UPLOAD_FILES_DIRECTORY=~/import
+	    volumes:
+	      - ../ssl:/opt/ssl
+	      - ./data:/var/data
 	    ports:
 	      - "9080:9080"
 
@@ -255,6 +269,115 @@ services:
 	Common properties are those, which
 	- have the same key AND value in ALL sub-modules they appear in	
 	- appear in properties files of at least two sub-modules
+
+
+## Volume Support
+
+The plugin supports volume mappings between host and container paths. Volumes can be configured in the plugin configuration and will be automatically included in the generated docker-compose files.
+
+### Volume Configuration
+
+Volumes are configured using the `<volumes>` section in the plugin configuration. **Important**: Use nested elements, not XML attributes.
+
+**✅ CORRECT Format:**
+```xml
+<volumes>
+  <volume>
+    <external>../ssl</external>
+    <internal>/opt/ssl</internal>
+  </volume>
+  <volume>
+    <external>./data</external>
+    <internal>/var/data</internal>
+  </volume>
+</volumes>
+```
+
+**❌ INCORRECT Format:**
+```xml
+<volumes>
+  <volume external="../ssl" internal="/opt/ssl" />
+  <volume external="./data" internal="/var/data" />
+</volumes>
+```
+
+> **Note**: The attribute format does not work because Maven plugin parameter binding doesn't automatically map XML attributes to Java object fields. Always use the nested element format shown above.
+
+### Single Module Projects
+
+For single module projects, volumes are added directly to the service definition:
+
+```yaml
+name: demo-application
+services:
+  demo-application:
+    image: nexus.magiccode.net:8891/demo/demo-application:2.9.6-SNAPSHOT
+    environment:
+      - SERVER_PORT=8080
+    volumes:
+      - ../ssl:/opt/ssl
+      - ./data:/var/data
+    ports:
+      - "8080:8080"
+```
+
+### Multi-Module Projects with Volume Commonization
+
+Just like environment variables, volumes are subject to commonization in multi-module projects. The plugin follows these rules:
+
+1. **Common volumes** are those that appear in at least 2 modules with identical external and internal paths
+2. **Common volumes** are extracted to a YAML anchor section
+3. **Services with only common volumes** use the merge key (`<<: *common-volumes`) to inherit volumes
+4. **Services with additional specific volumes** list ALL volumes directly (both common and specific)
+
+Example multi-module docker-compose with volume commonization:
+
+```yaml
+name: demo-system
+x-demo-system-common:
+    &demo-system-common
+    environment:
+      &demo-system-env
+      SPRING_PROFILES_ACTIVE: demo,postgres
+    volumes:
+      &demo-system-volumes
+      - ../ssl:/opt/ssl
+services:
+  demo-backend:
+    <<: *demo-system-common
+    image: nexus.magiccode.net:8891/demo/demo-backend:2.9.6-SNAPSHOT
+    environment:
+      <<: *demo-system-env
+      SERVER_PORT: 8080
+    volumes:
+      - ../ssl:/opt/ssl
+      - ./backend-logs:/var/log
+    ports:
+      - "8080:8080"
+  demo-frontend:
+    <<: *demo-system-common
+    image: nexus.magiccode.net:8891/demo/demo-frontend:2.9.6-SNAPSHOT
+    environment:
+      <<: *demo-system-env
+      SERVER_PORT: 9080
+    ports:
+      - "9080:9080"
+```
+
+In this example:
+- `../ssl:/opt/ssl` is a common volume shared by both services
+- `demo-backend` has an additional specific volume `./backend-logs:/var/log`, so it lists all volumes directly
+- `demo-frontend` only uses common volumes, so it inherits them via the merge anchor
+
+### Volume Path Types
+
+The plugin supports various volume path formats:
+
+- **Relative paths**: `../ssl`, `./data`, `logs`
+- **Absolute paths**: `/host/path`  
+- **Named volumes**: `my-volume`
+
+Both external (host) and internal (container) paths support these formats and can include spaces, hyphens, and underscores.
 	
 
 ## Build-profiles

@@ -31,6 +31,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -90,6 +91,11 @@ public class ComposeFileGenerator {
 	private boolean createEnvironmentFile;
 	
 	/**
+	 * List of volume mappings for shared volumes in multi-module projects.
+	 */
+	private List<VolumeMapping> commonVolumes;
+	
+	/**
 	 * Creates a docker-compose file for the project or module.
 	 *
 	 * @throws IOException if there is an issue writing the docker-compose file
@@ -103,9 +109,12 @@ public class ComposeFileGenerator {
 	 	try (BufferedWriter writer = Files.newBufferedWriter(dockerComposeFile)) {	 		
 	 		writer.write(generateCommentSection(activeProfile, moduleName)); 		
 	 		writer.write("name: " + moduleName+ "\n");
+	 		
 	 		boolean containsCommonEnvironment = (commonEnvironment!=null && ! commonEnvironment.isEmpty());
+	 		boolean containsCommonVolumes = (commonVolumes != null && !commonVolumes.isEmpty());
+	 		
 	 		String commonEnvironmentName = null, commonName=null;
-	 		if (containsCommonEnvironment) {
+	 		if (containsCommonEnvironment || containsCommonVolumes) {
 	 			commonName = moduleName+"-common";
 	 			commonEnvironmentName = moduleName+"-env";
 	 			StringBuffer commonBuffer = new StringBuffer();
@@ -113,27 +122,66 @@ public class ComposeFileGenerator {
 	 			commonBuffer.append(StringUtils.repeat(" ", 4))
 	 						.append("&").append(moduleName).append("-common\n");
 	 			
-	 			commonBuffer.append(StringUtils.repeat(" ", 4)).append("environment:\n");
-
-	 			commonBuffer.append(StringUtils.repeat(" ", 6)).append("&")
-	 														   .append(commonEnvironmentName)
-	 														   .append("\n");;
-	 														   	 			
-	 			commonEnvironment.entrySet()	    			
-					    		 .stream()
-						 		 .sorted(Map.Entry.comparingByKey())
-					    		 .forEach(entry -> commonBuffer.append(StringUtils.repeat(" ", 6))
-					    							  		   .append(entry.getKey())
-					    									   .append(": ")
-					    									   .append(EnvironmentHelper.generateValueEntry(createEnvironmentFile, entry.getKey(), entry.getValue()))
-					    									   .append("\n"));
+	 			if (containsCommonEnvironment) {
+		 			commonBuffer.append(StringUtils.repeat(" ", 4)).append("environment:\n");
+		 			commonBuffer.append(StringUtils.repeat(" ", 6)).append("&")
+		 														   .append(commonEnvironmentName)
+		 														   .append("\n");
+		 														   	 			
+		 			commonEnvironment.entrySet()	    			
+							    		 .stream()
+								 		 .sorted(Map.Entry.comparingByKey())
+							    		 .forEach(entry -> commonBuffer.append(StringUtils.repeat(" ", 6))
+							    							  		   .append(entry.getKey())
+							    									   .append(": ")
+							    									   .append(EnvironmentHelper.generateValueEntry(createEnvironmentFile, entry.getKey(), entry.getValue()))
+							    									   .append("\n"));
+	 			}
+	 			
+	 			if (containsCommonVolumes) {
+		 			commonBuffer.append(StringUtils.repeat(" ", 4)).append("volumes:\n");
+		 			commonBuffer.append(StringUtils.repeat(" ", 6)).append("&")
+		 														   .append(moduleName).append("-volumes")
+		 														   .append("\n");
+		 			commonVolumes.stream()
+		 						.sorted((v1, v2) -> v1.getExternal().compareTo(v2.getExternal()))
+		 						.forEach(volume -> commonBuffer.append(StringUtils.repeat(" ", 6))
+		 													   .append("- ")
+		 													   .append(volume.getExternal()).append(":")
+		 													   .append(volume.getInternal()).append("\n"));
+	 			}
 	 			
 	 			writer.write(commonBuffer.toString());
 	 		}
-	 		
+
 			writer.write("services:\n");
 			for (DockerService service : services) {
-				 writer.write(service.generateServiceEntry(commonName, commonEnvironmentName));
+				// If this service has specific volumes and there are common volumes,
+				// merge them according to the requirement: services with additional volumes
+				// should list ALL volumes directly
+				if (containsCommonVolumes && !service.getSpecificVolumes().isEmpty()) {
+					// Create a new list with common volumes first, then specific volumes
+					List<VolumeMapping> originalSpecific = new ArrayList<>(service.getSpecificVolumes());
+					
+					// Ensure we can modify the service's specificVolumes list
+					if (!(service.getSpecificVolumes() instanceof ArrayList)) {
+						service.setSpecificVolumes(new ArrayList<>(service.getSpecificVolumes()));
+					}
+					
+					service.getSpecificVolumes().clear();
+					
+					// Add common volumes first
+					service.getSpecificVolumes().addAll(commonVolumes);
+					
+					// Add specific volumes that are not already in common
+					for (VolumeMapping specificVol : originalSpecific) {
+						if (!commonVolumes.contains(specificVol)) {
+							service.getSpecificVolumes().add(specificVol);
+						}
+					}
+				}
+				
+				writer.write(service.generateServiceEntry(commonName, commonEnvironmentName, containsCommonVolumes, moduleName));
 			}
 		}
 		log.info("Generated Docker Compose file: " + dockerComposeFile.toString());
