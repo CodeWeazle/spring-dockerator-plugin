@@ -1,0 +1,6 @@
+# Test docker-compose validation
+services:
+  limit-engine:
+    <<: *limit-system-common
+    image: test
+
