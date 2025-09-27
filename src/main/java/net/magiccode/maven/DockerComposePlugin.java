@@ -16,6 +16,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
 
 import org.apache.maven.model.Profile;
 import org.apache.maven.plugin.AbstractMojo;
@@ -25,6 +29,11 @@ import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.project.MavenProject;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+import org.xml.sax.SAXException;
 import org.yaml.snakeyaml.Yaml;
 
 import lombok.extern.log4j.Log4j2;
@@ -344,65 +353,152 @@ public class DockerComposePlugin extends AbstractMojo {
 	}
 
 	/**
-	 * Compiles a list of common volumes for the given services and returns it.
-	 * All common volumes are removed from the service instances to avoid duplications.
-	 * A volume is considered common if it occurs in at least 2 modules and matches
-	 * both the external and internal paths in all modules where the volume occurs.
+	 * Compiles a list of common volumes for the given services and optimizes volume configuration.
+	 * A volume is considered common if it occurs in at least 2 services and matches
+	 * both the external and internal paths in all services where the volume occurs.
 	 * 
-	 * According to Docker Compose requirements: if a service defines specific volumes,
-	 * all volumes (common + specific) are listed directly in that service to comply
-	 * with Docker Compose and YAML rules.
+	 * Optimization Strategy:
+	 * - If all services have only common volumes: all services use x-common reference, return common volumes
+	 * - If some services have non-common volumes: those services list ALL volumes directly, 
+	 *   others use x-common reference, return common volumes
+	 * - If no common volumes exist: services keep their specific volumes, return empty list
+	 * 
+	 * This ensures Docker Compose compliance while maximizing YAML optimization.
 	 * 
 	 * @param services the list of services for the multi-module project
-	 * @return a list of common volumes fulfilling the above conditions across all modules
+	 * @return a list of common volumes to be used in x-common reference
 	 */
 	private List<VolumeMapping> compileCommonVolumes(List<DockerService> services) {
 		final List<VolumeMapping> commonVolumes = new ArrayList<>();
+		
 		if (services == null || services.size() < 2) {
+			if (services == null) {
+				log.info("📦 No services provided for volume optimization");
+			} else if (services.size() == 1) {
+				log.info("📦 Single service detected - no volume optimization needed");
+			}
 			return commonVolumes;
 		}
+		
+		log.info("📦 Analyzing volume configurations across {} services for optimization...", services.size());
 
 		// Count occurrences of each volume mapping
 		Map<VolumeMapping, Integer> volumeCounts = new HashMap<>();
+		int totalVolumeCount = 0;
+		
 		for (DockerService service : services) {
+			log.info("   🔍 Service '{}' has {} volume(s): {}", 
+				service.getName() != null ? service.getName() : "unnamed", 
+				service.getSpecificVolumes().size(),
+				service.getSpecificVolumes().isEmpty() ? "none" : 
+					service.getSpecificVolumes().stream()
+						.map(v -> v.getExternal() + " -> " + v.getInternal())
+						.collect(Collectors.joining(", ")));
+			
 			for (VolumeMapping volume : service.getSpecificVolumes()) {
 				volumeCounts.put(volume, volumeCounts.getOrDefault(volume, 0) + 1);
+				totalVolumeCount++;
 			}
+		}
+		
+		if (totalVolumeCount == 0) {
+			log.info("📦 No volumes found across all services - no optimization possible");
+			return commonVolumes;
 		}
 
 		// Find volumes that occur in at least 2 services
 		for (Map.Entry<VolumeMapping, Integer> entry : volumeCounts.entrySet()) {
 			if (entry.getValue() >= 2) {
 				commonVolumes.add(entry.getKey());
-				log.info("Found common volume: {} -> {} (appears in {} service(s))", 
+				log.info("✅ Found common volume: {} -> {} (appears in {} service(s))", 
 						entry.getKey().getExternal(), entry.getKey().getInternal(), entry.getValue());
 			}
 		}
+		
+		if (commonVolumes.isEmpty()) {
+			log.info("📦 No common volumes found - each service will list its volumes directly");
+			return commonVolumes;
+		}
+		
+		log.info("📦 Identified {} common volume(s) for potential x-common reference optimization", commonVolumes.size());
 
-		// According to requirements: "If the submodule/service itself defines volumes, 
-		// just add the list of additional volumes and do not use the common-volumes 
-		// to comply with the rules given by docker compose and yaml."
-		// This means services with specific volumes should list ALL volumes directly.
+		// Apply Docker Compose optimization strategy:
+		// Step 1: Identify which services have volumes beyond the common ones
+		log.info("🔍 Analyzing services to determine optimization strategy...");
+		boolean hasServicesWithSpecificVolumes = false;
+		int servicesWithNonCommonVolumes = 0;
+		
 		for (DockerService service : services) {
-			boolean hasSpecificVolumes = !service.getSpecificVolumes().isEmpty();
-			if (hasSpecificVolumes) {
-				// Services with specific volumes should list ALL volumes (common + specific) directly
-				// Create a new list with common volumes first, then specific volumes
-				List<VolumeMapping> allVolumes = new ArrayList<>(commonVolumes);
-				for (VolumeMapping specificVol : new ArrayList<>(service.getSpecificVolumes())) {
-					if (!commonVolumes.contains(specificVol)) {
-						allVolumes.add(specificVol);
-					}
+			// Check if service has volumes that are NOT in common volumes
+			boolean hasNonCommon = false;
+			for (VolumeMapping volume : service.getSpecificVolumes()) {
+				if (!commonVolumes.contains(volume)) {
+					hasServicesWithSpecificVolumes = true;
+					hasNonCommon = true;
+					break;
 				}
-				service.getSpecificVolumes().clear();
-				service.getSpecificVolumes().addAll(allVolumes);
+			}
+			if (hasNonCommon) {
+				servicesWithNonCommonVolumes++;
+				log.info("   📋 Service '{}' has non-common volumes (will list all volumes directly)", 
+					service.getName() != null ? service.getName() : "unnamed");
 			} else {
-				// Remove common volumes from services that have no specific volumes
-				service.getSpecificVolumes().removeAll(commonVolumes);
+				log.info("   📋 Service '{}' has only common volumes (will use x-common reference)", 
+					service.getName() != null ? service.getName() : "unnamed");
 			}
 		}
-
-		return commonVolumes;
+		
+		// Step 2: Apply the appropriate strategy based on whether any service has non-common volumes
+		if (hasServicesWithSpecificVolumes) {
+			log.info("🎯 Mixed optimization strategy: {} service(s) with non-common volumes will list all volumes directly, others use x-common reference", 
+				servicesWithNonCommonVolumes);
+			
+			// Mixed scenario: some services have non-common volumes
+			// Strategy: services with non-common volumes get ALL volumes, others use common reference
+			for (DockerService service : services) {
+				boolean hasNonCommonVolumes = service.getSpecificVolumes().stream()
+					.anyMatch(volume -> !commonVolumes.contains(volume));
+				
+				if (hasNonCommonVolumes) {
+					// Service has non-common volumes - include ALL volumes directly (common + specific)
+					int originalCount = service.getSpecificVolumes().size();
+					List<VolumeMapping> allVolumes = new ArrayList<>(commonVolumes);
+					for (VolumeMapping specificVol : new ArrayList<>(service.getSpecificVolumes())) {
+						if (!commonVolumes.contains(specificVol)) {
+							allVolumes.add(specificVol);
+						}
+					}
+					service.getSpecificVolumes().clear();
+					service.getSpecificVolumes().addAll(allVolumes);
+					log.info("   ✅ Service '{}': expanded from {} to {} volume(s) (common + specific)", 
+						service.getName() != null ? service.getName() : "unnamed", originalCount, allVolumes.size());
+				} else {
+					// Service has only common volumes - will use common reference only
+					int clearedCount = service.getSpecificVolumes().size();
+					service.getSpecificVolumes().clear();
+					log.info("   ✅ Service '{}': cleared {} volume(s) (will use x-common reference)", 
+						service.getName() != null ? service.getName() : "unnamed", clearedCount);
+				}
+			}
+			log.info("📦 Returning {} common volume(s) for x-common reference", commonVolumes.size());
+			// Return common volumes for x-common reference (used by services without non-common volumes)
+			return commonVolumes;
+		} else {
+			log.info("🎯 Full optimization strategy: All services have identical volumes - using x-common reference for all");
+			
+			// All services have identical volumes - use common reference for all services
+			int totalClearedVolumes = 0;
+			for (DockerService service : services) {
+				int clearedCount = service.getSpecificVolumes().size();
+				totalClearedVolumes += clearedCount;
+				service.getSpecificVolumes().clear();
+				log.info("   ✅ Service '{}': cleared {} volume(s) (will use x-common reference)", 
+					service.getName() != null ? service.getName() : "unnamed", clearedCount);
+			}
+			log.info("📦 Optimization complete: {} volume(s) moved to x-common reference, {} total volume declarations saved", 
+				commonVolumes.size(), totalClearedVolumes - commonVolumes.size());
+			return commonVolumes;
+		}
 	}
 
 	/**
@@ -425,32 +521,64 @@ public class DockerComposePlugin extends AbstractMojo {
 		List<String> ports = new ArrayList<>();
 		List<VolumeMapping> volumeMappings = new ArrayList<>();
 
-		// Process configured volumes
+		// Process volume configurations - combine parent and module-specific volumes
+		List<Volume> moduleVolumes = extractModuleVolumeConfiguration(moduleDirectory);
+		List<Volume> consolidatedVolumes = new ArrayList<>();
+		
+		// Always start with parent volumes (if any)
 		if (volumes != null && !volumes.isEmpty()) {
-			log.info("Processing {} configured volume(s) for module: {}", volumes.size(), serviceName);
-			for (int i = 0; i < volumes.size(); i++) {
-				Volume volume = volumes.get(i);
-				if (log.isDebugEnabled()) {
-					log.debug("Volume {}: external='{}', internal='{}'", i, volume.getExternal(), volume.getInternal());
-				}
+			consolidatedVolumes.addAll(volumes);
+			log.info("📦 Inherited {} volume(s) from parent configuration for module: {}", volumes.size(), serviceName);
+		} else {
+			log.info("📦 No parent volume configuration found for module: {}", serviceName);
+		}
+		
+		// Add module-specific volumes (if any)
+		if (!moduleVolumes.isEmpty()) {
+			consolidatedVolumes.addAll(moduleVolumes);
+			log.info("📦 Added {} module-specific volume(s) for module: {}", moduleVolumes.size(), serviceName);
+		} else {
+			log.info("📦 No module-specific volume configuration found for module: {}", serviceName);
+		}
+		
+		if (!consolidatedVolumes.isEmpty()) {
+			log.info("📦 Processing {} total volume(s) for module: {} (parent: {}, module-specific: {})", 
+					consolidatedVolumes.size(), serviceName, 
+					(volumes != null ? volumes.size() : 0), moduleVolumes.size());
+			
+			int validVolumes = 0;
+			int skippedVolumes = 0;
+			
+			for (int i = 0; i < consolidatedVolumes.size(); i++) {
+				Volume volume = consolidatedVolumes.get(i);
+				String source = i < (volumes != null ? volumes.size() : 0) ? "parent" : "module";
+				log.info("  📁 Volume {} ({}): external='{}', internal='{}'", i, source, volume.getExternal(), volume.getInternal());
 				if (volume.getExternal() != null && volume.getInternal() != null) {
 					VolumeMapping mapping = VolumeMapping.builder()
 							.external(volume.getExternal())
 							.internal(volume.getInternal())
 							.build();
 					volumeMappings.add(mapping);
-					log.info("✓ Added volume mapping: {} -> {}", volume.getExternal(), volume.getInternal());
+					log.info("    ✅ Added volume mapping: {} -> {}", volume.getExternal(), volume.getInternal());
+					validVolumes++;
 				} else {
-					log.warn("✗ Skipping incomplete volume configuration: external='{}', internal='{}'", 
+					log.warn("    ❌ Skipping incomplete volume configuration: external='{}', internal='{}'", 
 							volume.getExternal(), volume.getInternal());
+					skippedVolumes++;
 				}
 			}
-		} else {
-			if (volumes == null) {
-				log.info("No volume configuration found for module: {}", serviceName);
+			
+			if (skippedVolumes > 0) {
+				log.warn("⚠️  Volume processing summary for {}: {} valid, {} skipped due to incomplete configuration", 
+						serviceName, validVolumes, skippedVolumes);
+				log.warn("💡 Tip: Ensure volume configurations use nested XML elements (not attributes):");
+				log.warn("   ✅ Correct: <volume><external>../ssl</external><internal>/opt/ssl</internal></volume>");
+				log.warn("   ❌ Incorrect: <volume external=\"../ssl\" internal=\"/opt/ssl\" />");
 			} else {
-				log.info("Volume configuration is empty for module: {}", serviceName);
+				log.info("📋 Volume processing completed for {}: {} volume mapping(s) configured", serviceName, validVolumes);
 			}
+		} else {
+			log.info("📦 No volume configuration found for module: {} - service will have no volume mappings", serviceName);
 		}
 
 		// Iterate through all specified properties directories
@@ -781,6 +909,110 @@ public class DockerComposePlugin extends AbstractMojo {
 		}
 		log.info("Successfully generated environment file: {}", environmentFile.toString());
 		return true;
+	}
+
+	/**
+	 * Extracts volume configuration from a module's pom.xml file.
+	 * This enables per-module volume configuration instead of relying only on parent configuration.
+	 * 
+	 * @param moduleDirectory the directory of the module to extract volume configuration from
+	 * @return list of volumes configured for this specific module, empty list if none found
+	 */
+	private List<Volume> extractModuleVolumeConfiguration(File moduleDirectory) {
+		List<Volume> moduleVolumes = new ArrayList<>();
+		File pomFile = new File(moduleDirectory, "pom.xml");
+		
+		if (!pomFile.exists()) {
+			log.debug("No pom.xml found in module directory: {}", moduleDirectory.getAbsolutePath());
+			return moduleVolumes;
+		}
+
+		try {
+			DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+			DocumentBuilder builder = factory.newDocumentBuilder();
+			Document doc = builder.parse(pomFile);
+			doc.getDocumentElement().normalize();
+
+			// Look for plugin configuration in the module's pom.xml
+			NodeList plugins = doc.getElementsByTagName("plugin");
+			for (int i = 0; i < plugins.getLength(); i++) {
+				Node pluginNode = plugins.item(i);
+				if (pluginNode.getNodeType() == Node.ELEMENT_NODE) {
+					Element pluginElement = (Element) pluginNode;
+					
+					// Check if this is our spring-dockerator-plugin
+					NodeList artifactIds = pluginElement.getElementsByTagName("artifactId");
+					for (int j = 0; j < artifactIds.getLength(); j++) {
+						Element artifactId = (Element) artifactIds.item(j);
+						if ("spring-dockerator-plugin".equals(artifactId.getTextContent())) {
+							// Found our plugin, now look for volume configuration
+							moduleVolumes.addAll(parseVolumeConfiguration(pluginElement, moduleDirectory.getName()));
+							break;
+						}
+					}
+				}
+			}
+		} catch (ParserConfigurationException | SAXException | IOException e) {
+			log.warn("Failed to parse pom.xml for module {}: {}", moduleDirectory.getName(), e.getMessage());
+		}
+
+		return moduleVolumes;
+	}
+
+	/**
+	 * Parses volume configuration from plugin configuration XML element.
+	 * 
+	 * @param pluginElement the plugin configuration element containing volume settings
+	 * @param moduleName the name of the module for logging purposes
+	 * @return list of parsed volume configurations
+	 */
+	private List<Volume> parseVolumeConfiguration(Element pluginElement, String moduleName) {
+		List<Volume> volumes = new ArrayList<>();
+
+		// Look for <configuration><volumes> section
+		NodeList configurations = pluginElement.getElementsByTagName("configuration");
+		for (int i = 0; i < configurations.getLength(); i++) {
+			Element configuration = (Element) configurations.item(i);
+			NodeList volumesNodes = configuration.getElementsByTagName("volumes");
+			
+			for (int j = 0; j < volumesNodes.getLength(); j++) {
+				Element volumesElement = (Element) volumesNodes.item(j);
+				NodeList volumeNodes = volumesElement.getElementsByTagName("volume");
+				
+				log.debug("Found {} volume configuration(s) in module: {}", volumeNodes.getLength(), moduleName);
+				
+				for (int k = 0; k < volumeNodes.getLength(); k++) {
+					Element volumeElement = (Element) volumeNodes.item(k);
+					
+					String external = null;
+					String internal = null;
+					
+					// Look for <external> and <internal> elements
+					NodeList externalNodes = volumeElement.getElementsByTagName("external");
+					if (externalNodes.getLength() > 0) {
+						external = externalNodes.item(0).getTextContent().trim();
+					}
+					
+					NodeList internalNodes = volumeElement.getElementsByTagName("internal");
+					if (internalNodes.getLength() > 0) {
+						internal = internalNodes.item(0).getTextContent().trim();
+					}
+					
+					if (external != null && internal != null && !external.isEmpty() && !internal.isEmpty()) {
+						Volume volume = new Volume();
+						volume.setExternal(external);
+						volume.setInternal(internal);
+						volumes.add(volume);
+						log.debug("Parsed volume from module {}: {} -> {}", moduleName, external, internal);
+					} else {
+						log.warn("Incomplete volume configuration in module {}: external='{}', internal='{}'", 
+								moduleName, external, internal);
+					}
+				}
+			}
+		}
+
+		return volumes;
 	}
 
 }
