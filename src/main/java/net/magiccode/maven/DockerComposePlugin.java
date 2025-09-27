@@ -286,8 +286,11 @@ public class DockerComposePlugin extends AbstractMojo {
 			} else if (moduleHelper.isRunnableModule(module)) {
 				DockerService dockerService = generateService(module);
 				services.add(dockerService);
+				
+				// Create module-specific compose file with ONLY this module's service
+				List<DockerService> singleModuleServices = List.of(dockerService);
 				ComposeFileGenerator composeFileGenerator = ComposeFileGenerator.builder().outputDir(outputDir)
-						.moduleName(module.getName()).services(services).activeProfile(activeProfile)
+						.moduleName(module.getName()).services(singleModuleServices).activeProfile(activeProfile)
 						.createEnvironmentFile(createEnv).build();
 				composeFileGenerator.generateModuleDockerCompose();
 			} else {

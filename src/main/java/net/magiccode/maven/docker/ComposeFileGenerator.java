@@ -203,10 +203,15 @@ public class ComposeFileGenerator {
 	    	writer.write(generateCommentSection(activeProfile, moduleName));
 	    	writer.write("name: " + moduleName+ "\n");
 	        writer.write("services:\n");
-	        writer.write(services.stream().filter(service->service.getName().equals(moduleName))
-	        		                      .findFirst()
-	        		                      .get()
-	        		                      .generateServiceEntry());
+	        
+	        // Find the service that matches this module name
+	        DockerService moduleService = services.stream()
+	        	.filter(service -> service.getName().equals(moduleName))
+	        	.findFirst()
+	        	.orElseThrow(() -> new IOException("No service found for module: " + moduleName));
+	        
+	        // Generate service entry without common references (single module = no commons)
+	        writer.write(moduleService.generateServiceEntry());
 	    }
 	    log.info("Generated module-specific Docker Compose file: " + moduleComposeFile.toString());
 	}
