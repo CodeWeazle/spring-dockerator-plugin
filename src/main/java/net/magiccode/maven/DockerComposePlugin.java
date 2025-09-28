@@ -676,14 +676,13 @@ public class DockerComposePlugin extends AbstractMojo {
 					String key = keyValue[0].trim();
 					String value = keyValue[1].trim();
 					dockerEnvVars.put(key, value);
+					
+					// Include server.port in ports only when marked with #DockerInclude
+					if (key.equals(SERVER_PORT_PROPERTY)) {
+						ports.add(value);
+					}
 				}
 				includeNext = false; // Reset the flag after processing
-			}
-
-			// Always include server.port in ports
-			if (line.startsWith(SERVER_PORT_PROPERTY + "=")) {
-				String port = line.split("=", 2)[1].trim();
-				ports.add(port);
 			}
 
 			// Capture JDBC configurations based on configurable prefix
@@ -775,7 +774,7 @@ public class DockerComposePlugin extends AbstractMojo {
 					jdbcConfigs.put(formattedKey, stringValue);
 				}
 
-				// Always include server.port in ports
+				// Check for server.port (for ports mapping)
 				if (formattedKey.equals(SERVER_PORT_PROPERTY.toUpperCase().replace(".", "_").replace("-", "_"))) {
 					ports.add(stringValue);
 				}
