@@ -40,7 +40,7 @@ To add this plugin to your project, simply follow the usual pattern for Maven pl
 	        <plugin>
 			  <groupId>net.magiccode.maven</groupId>
 			  <artifactId>spring-dockerator-plugin</artifactId>
-			  <version>0.0.6-SNAPSHOT</version>
+			  <version>0.0.6</version>
 	          <configuration>
 	            <!-- put your configurations here -->
 	          </configuration>
@@ -59,7 +59,7 @@ To add this plugin to your project, simply follow the usual pattern for Maven pl
 		<plugin>
 			<groupId>net.magiccode.maven</groupId>
 			<artifactId>spring-dockerator-plugin</artifactId>
-			<version>0.0.6-SNAPSHOT</version>
+			<version>0.0.6</version>
 			<executions>
 				<execution>
 					<goals>
@@ -117,7 +117,7 @@ Without any configuration, the plugin will not do very much.
 		<plugin>
 			<groupId>net.magiccode.maven</groupId>
 			<artifactId>spring-dockerator-plugin</artifactId>
-			<version>0.0.6-SNAPSHOT</version>
+			<version>0.0.6</version>
 			<executions>
 				<execution>
 					<goals>
