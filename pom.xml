@@ -4,7 +4,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>net.magiccode.maven</groupId>
 	<artifactId>spring-dockerator-plugin</artifactId>
-	<version>0.0.6-SNAPSHOT</version>
+	<version>0.0.7-SNAPSHOT</version>
 	<packaging>maven-plugin</packaging>
 
 	<name>Spring Dockerator Plugin</name>
