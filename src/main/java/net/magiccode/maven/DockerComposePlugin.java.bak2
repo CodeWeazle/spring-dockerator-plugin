@@ -139,11 +139,11 @@ public class DockerComposePlugin extends AbstractMojo {
 				
 				// In multi-module projects, process the modules
 				if (!modules.isEmpty()) {
-					getLog().info("Multi-module project detected with " + modules.size() + " module(s)");
+					getLog().info("Multi-module project detected with {} module(s)", modules.size());
 					commonEnvironment = processModules(moduleHelper, modules, services, profile);
 					commonVolumes = compileCommonVolumes(services);
 					if (!commonVolumes.isEmpty()) {
-						getLog().info("Found " + commonVolumes.size() + " common volume(s) across modules");
+						getLog().info("Found {} common volume(s) across modules", commonVolumes.size());
 					}
 				} else {
 					getLog().info("Single module project detected");
@@ -152,9 +152,9 @@ public class DockerComposePlugin extends AbstractMojo {
 				}
 				// Generate docker-compose.yml for all services
 				if (!services.isEmpty()) {
-					getLog().info("Generating docker-compose.yml for " + services.size() + " service(s)");
+					getLog().info("Generating docker-compose.yml for {} service(s)", services.size());
 					if (!commonEnvironment.isEmpty()) {
-						getLog().info("Found " + commonEnvironment.size() + " common environment variable(s)");
+						getLog().info("Found {} common environment variable(s)", commonEnvironment.size());
 					}
 					ComposeFileGenerator composeFileGenerator = ComposeFileGenerator.builder().services(services)
 							.outputDir(outputDir).commonEnvironment(commonEnvironment).commonVolumes(commonVolumes)
@@ -162,12 +162,12 @@ public class DockerComposePlugin extends AbstractMojo {
 					composeFileGenerator.generateDockerCompose();
 					getLog().info("Successfully generated docker-compose.yml");
 				} else {
-					getLog().warn("No runnable modules found; docker-compose.yml will not be generated.");
+					log.warn("No runnable modules found; docker-compose.yml will not be generated.");
 				}
 
 				// Generate docker-compose-db.yml for database containers
 				if (!globalJdbcConfigs.isEmpty()) {
-					getLog().info("Generating database docker-compose file with " + globalJdbcConfigs.size() + " JDBC configuration(s)");
+					getLog().info("Generating database docker-compose file with {} JDBC configuration(s)", globalJdbcConfigs.size());
 					generateDatabaseCompose(globalJdbcConfigs);
 				}
 				// create .env file if required
@@ -177,7 +177,7 @@ public class DockerComposePlugin extends AbstractMojo {
 				}
 
 			} catch (IOException | MojoExecutionException e) {
-				getLog().error("Error during plugin execution: " + e.getMessage());
+				log.error("Error during plugin execution: {}", e.getMessage());
 				throw new RuntimeException(new MojoExecutionException("Error processing property files", e));
 			}
 		});
@@ -221,10 +221,10 @@ public class DockerComposePlugin extends AbstractMojo {
 					}
 				}
 			} else {
-				getLog().warn("Properties directory not found: " + modulePropertiesDir.toString());
+				log.warn("Properties directory not found: " + modulePropertiesDir.toString());
 			}
 		} catch (IOException e) {
-			getLog().warn("Exceptiokn occured while cleaning up properties/yaml files in target.");
+			log.warn("Exceptiokn occured while cleaning up properties/yaml files in target.");
 		}
 	}
 
@@ -380,15 +380,20 @@ public class DockerComposePlugin extends AbstractMojo {
 			return commonVolumes;
 		}
 		
-		getLog().info("📦 Analyzing volume configurations across " + services.size() + " services for optimization...");
+		getLog().info("📦 Analyzing volume configurations across {} services for optimization...", services.size());
 
 		// Count occurrences of each volume mapping
 		Map<VolumeMapping, Integer> volumeCounts = new HashMap<>();
 		int totalVolumeCount = 0;
 		
 		for (DockerService service : services) {
-			// Debug logging - TODO: Fix complex logging format
-			// getLog().info("   🔍 Service '" + service.getName() + "' has " + service.getSpecificVolumes().size() + " volume(s)");
+			getLog().info("   🔍 Service '{}' has {} volume(s): {}", 
+				service.getName() != null ? service.getName() : "unnamed", 
+				service.getSpecificVolumes().size(),
+				service.getSpecificVolumes().isEmpty() ? "none" : 
+					service.getSpecificVolumes().stream()
+						.map(v -> v.getExternal() + " -> " + v.getInternal())
+						.collect(Collectors.joining(", ")));
 			
 			for (VolumeMapping volume : service.getSpecificVolumes()) {
 				volumeCounts.put(volume, volumeCounts.getOrDefault(volume, 0) + 1);
@@ -405,7 +410,8 @@ public class DockerComposePlugin extends AbstractMojo {
 		for (Map.Entry<VolumeMapping, Integer> entry : volumeCounts.entrySet()) {
 			if (entry.getValue() >= 2) {
 				commonVolumes.add(entry.getKey());
-				// TODO: Fix complex logging format - getLog().info("✅ Found common volume: {} -> {} (appears in {} service(s))", entry.getKey().getExternal(), entry.getKey().getInternal(), entry.getValue());
+				getLog().info("✅ Found common volume: {} -> {} (appears in {} service(s))", 
+						entry.getKey().getExternal(), entry.getKey().getInternal(), entry.getValue());
 			}
 		}
 		
@@ -414,7 +420,7 @@ public class DockerComposePlugin extends AbstractMojo {
 			return commonVolumes;
 		}
 		
-// TODO: Fix complex logging format - 		getLog().info("📦 Identified {} common volume(s) for potential x-common reference optimization", commonVolumes.size());
+		getLog().info("📦 Identified {} common volume(s) for potential x-common reference optimization", commonVolumes.size());
 
 		// Apply Docker Compose optimization strategy:
 		// Step 1: Identify which services have volumes beyond the common ones
@@ -434,16 +440,18 @@ public class DockerComposePlugin extends AbstractMojo {
 			}
 			if (hasNonCommon) {
 				servicesWithNonCommonVolumes++;
-				// TODO: Fix complex logging format - Service has non-common volumes (will list all volumes directly)
+				getLog().info("   📋 Service '{}' has non-common volumes (will list all volumes directly)", 
+					service.getName() != null ? service.getName() : "unnamed");
 			} else {
-				// TODO: Fix complex logging format - Service has only common volumes (will use x-common reference)
+				getLog().info("   📋 Service '{}' has only common volumes (will use x-common reference)", 
+					service.getName() != null ? service.getName() : "unnamed");
 			}
 		}
 		
 		// Step 2: Apply the appropriate strategy based on whether any service has non-common volumes
 		if (hasServicesWithSpecificVolumes) {
-			// TODO: Fix complex logging format - Mixed optimization strategy 
-			getLog().info("Mixed optimization strategy: " + servicesWithNonCommonVolumes + " service(s) with non-common volumes");
+			getLog().info("🎯 Mixed optimization strategy: {} service(s) with non-common volumes will list all volumes directly, others use x-common reference", 
+				servicesWithNonCommonVolumes);
 			
 			// Mixed scenario: some services have non-common volumes
 			// Strategy: services with non-common volumes get ALL volumes, others use common reference
@@ -462,15 +470,17 @@ public class DockerComposePlugin extends AbstractMojo {
 					}
 					service.getSpecificVolumes().clear();
 					service.getSpecificVolumes().addAll(allVolumes);
-					// TODO: Fix complex logging format - Service expanded from originalCount to allVolumes.size() volume(s) (common + specific)
+					getLog().info("   ✅ Service '{}': expanded from {} to {} volume(s) (common + specific)", 
+						service.getName() != null ? service.getName() : "unnamed", originalCount, allVolumes.size());
 				} else {
 					// Service has only common volumes - will use common reference only
 					int clearedCount = service.getSpecificVolumes().size();
 					service.getSpecificVolumes().clear();
-					// TODO: Fix complex logging format - Service cleared clearedCount volume(s) (will use x-common reference)
+					getLog().info("   ✅ Service '{}': cleared {} volume(s) (will use x-common reference)", 
+						service.getName() != null ? service.getName() : "unnamed", clearedCount);
 				}
 			}
-			getLog().info("Returning " + commonVolumes.size() + " common volume(s) for x-common reference");
+			getLog().info("📦 Returning {} common volume(s) for x-common reference", commonVolumes.size());
 			// Return common volumes for x-common reference (used by services without non-common volumes)
 			return commonVolumes;
 		} else {
@@ -482,10 +492,11 @@ public class DockerComposePlugin extends AbstractMojo {
 				int clearedCount = service.getSpecificVolumes().size();
 				totalClearedVolumes += clearedCount;
 				service.getSpecificVolumes().clear();
-				// TODO: Fix complex logging format - Service cleared clearedCount volume(s) (will use x-common reference)
+				getLog().info("   ✅ Service '{}': cleared {} volume(s) (will use x-common reference)", 
+					service.getName() != null ? service.getName() : "unnamed", clearedCount);
 			}
-			getLog().info("Optimization complete: " + commonVolumes.size() + " volume(s) moved to x-common reference, " + 
-				(totalClearedVolumes - commonVolumes.size()) + " total volume declarations saved");
+			getLog().info("📦 Optimization complete: {} volume(s) moved to x-common reference, {} total volume declarations saved", 
+				commonVolumes.size(), totalClearedVolumes - commonVolumes.size());
 			return commonVolumes;
 		}
 	}
@@ -517,22 +528,23 @@ public class DockerComposePlugin extends AbstractMojo {
 		// Always start with parent volumes (if any)
 		if (volumes != null && !volumes.isEmpty()) {
 			consolidatedVolumes.addAll(volumes);
-// TODO: Fix complex logging format - 			getLog().info("📦 Inherited {} volume(s) from parent configuration for module: {}", volumes.size(), serviceName);
+			getLog().info("📦 Inherited {} volume(s) from parent configuration for module: {}", volumes.size(), serviceName);
 		} else {
-// TODO: Fix complex logging format - 			getLog().info("📦 No parent volume configuration found for module: {}", serviceName);
+			getLog().info("📦 No parent volume configuration found for module: {}", serviceName);
 		}
 		
 		// Add module-specific volumes (if any)
 		if (!moduleVolumes.isEmpty()) {
 			consolidatedVolumes.addAll(moduleVolumes);
-// TODO: Fix complex logging format - 			getLog().info("📦 Added {} module-specific volume(s) for module: {}", moduleVolumes.size(), serviceName);
+			getLog().info("📦 Added {} module-specific volume(s) for module: {}", moduleVolumes.size(), serviceName);
 		} else {
-		// TODO: Fix complex logging format - No module-specific volume configuration found for module
+			getLog().info("📦 No module-specific volume configuration found for module: {}", serviceName);
 		}
 		
 		if (!consolidatedVolumes.isEmpty()) {
-			getLog().info("Processing " + consolidatedVolumes.size() + " total volume(s) for module: " + serviceName + 
-				" (parent: " + (volumes != null ? volumes.size() : 0) + ", module-specific: " + moduleVolumes.size() + ")");
+			getLog().info("📦 Processing {} total volume(s) for module: {} (parent: {}, module-specific: {})", 
+					consolidatedVolumes.size(), serviceName, 
+					(volumes != null ? volumes.size() : 0), moduleVolumes.size());
 			
 			int validVolumes = 0;
 			int skippedVolumes = 0;
@@ -540,32 +552,33 @@ public class DockerComposePlugin extends AbstractMojo {
 			for (int i = 0; i < consolidatedVolumes.size(); i++) {
 				Volume volume = consolidatedVolumes.get(i);
 				String source = i < (volumes != null ? volumes.size() : 0) ? "parent" : "module";
-// TODO: Fix complex logging format - 				getLog().info("  📁 Volume {} ({}): external='{}', internal='{}'", i, source, volume.getExternal(), volume.getInternal());
+				getLog().info("  📁 Volume {} ({}): external='{}', internal='{}'", i, source, volume.getExternal(), volume.getInternal());
 				if (volume.getExternal() != null && volume.getInternal() != null) {
 					VolumeMapping mapping = VolumeMapping.builder()
 							.external(volume.getExternal())
 							.internal(volume.getInternal())
 							.build();
 					volumeMappings.add(mapping);
-				// TODO: Fix complex logging format - Added volume mapping external -> internal
+					getLog().info("    ✅ Added volume mapping: {} -> {}", volume.getExternal(), volume.getInternal());
 					validVolumes++;
 				} else {
-					// TODO: Fix complex logging format - Skipping incomplete volume configuration
+					log.warn("    ❌ Skipping incomplete volume configuration: external='{}', internal='{}'", 
+							volume.getExternal(), volume.getInternal());
 					skippedVolumes++;
 				}
 			}
 			
 			if (skippedVolumes > 0) {
-				getLog().warn("Volume processing summary for " + serviceName + ": " + validVolumes + 
-					" valid, " + skippedVolumes + " skipped due to incomplete configuration"); 
-				getLog().warn("💡 Tip: Ensure volume configurations use nested XML elements (not attributes):");
-				getLog().warn("   ✅ Correct: <volume><external>../ssl</external><internal>/opt/ssl</internal></volume>");
-				getLog().warn("   ❌ Incorrect: <volume external=\"../ssl\" internal=\"/opt/ssl\" />");
+				log.warn("⚠️  Volume processing summary for {}: {} valid, {} skipped due to incomplete configuration", 
+						serviceName, validVolumes, skippedVolumes);
+				log.warn("💡 Tip: Ensure volume configurations use nested XML elements (not attributes):");
+				log.warn("   ✅ Correct: <volume><external>../ssl</external><internal>/opt/ssl</internal></volume>");
+				log.warn("   ❌ Incorrect: <volume external=\"../ssl\" internal=\"/opt/ssl\" />");
 			} else {
-				getLog().info("Volume processing completed for " + serviceName + ": " + validVolumes + " volume mapping(s) configured");
+				getLog().info("📋 Volume processing completed for {}: {} volume mapping(s) configured", serviceName, validVolumes);
 			}
 		} else {
-			// TODO: Fix complex logging format - No volume configuration found for module - service will have no volume mappings
+			getLog().info("📦 No volume configuration found for module: {} - service will have no volume mappings", serviceName);
 		}
 
 		// Iterate through all specified properties directories
@@ -573,23 +586,23 @@ public class DockerComposePlugin extends AbstractMojo {
 			Path modulePropertiesDir = moduleDirectory.toPath().resolve(propertiesDirPath);
 
 			if (Files.exists(modulePropertiesDir)) {
-				if (getLog().isDebugEnabled()) {
-// TODO: Fix complex logging format - 					getLog().debug("Processing properties directory: {}", modulePropertiesDir.toString());
+				if (log.isDebugEnabled()) {
+					log.debug("Processing properties directory: {}", modulePropertiesDir.toString());
 				}
 
 				// Always include base application.properties and application.yml
 				Path applicationProperties = modulePropertiesDir.resolve("application.properties");
 				if (Files.exists(applicationProperties)) {
-					if (getLog().isDebugEnabled()) {
-// TODO: Fix complex logging format - 						getLog().debug("Reading base properties from: {}", applicationProperties.toString());
+					if (log.isDebugEnabled()) {
+						log.debug("Reading base properties from: {}", applicationProperties.toString());
 					}
 					processProperties(applicationProperties, dockerEnvVars, jdbcConfigs, ports);
 				}
 
 				Path applicationYaml = modulePropertiesDir.resolve("application.yml");
 				if (Files.exists(applicationYaml)) {
-					if (getLog().isDebugEnabled()) {
-// TODO: Fix complex logging format - 						getLog().debug("Reading base YAML properties from: {}", applicationYaml.toString());
+					if (log.isDebugEnabled()) {
+						log.debug("Reading base YAML properties from: {}", applicationYaml.toString());
 					}
 					processYaml(applicationYaml, dockerEnvVars, jdbcConfigs, ports);
 				}
@@ -598,22 +611,22 @@ public class DockerComposePlugin extends AbstractMojo {
 				for (String profile : profiles) {
 					Path propertiesFile = modulePropertiesDir.resolve("application-" + profile + ".properties");
 					if (Files.exists(propertiesFile)) {
-						if (getLog().isDebugEnabled()) {
-// TODO: Fix complex logging format - 							getLog().debug("Reading properties from: {}", propertiesFile.toString());
+						if (log.isDebugEnabled()) {
+							log.debug("Reading properties from: {}", propertiesFile.toString());
 						}
 						processProperties(propertiesFile, dockerEnvVars, jdbcConfigs, ports);
 					}
 
 					Path yamlFile = modulePropertiesDir.resolve("application-" + profile + ".yml");
 					if (Files.exists(yamlFile)) {
-						if (getLog().isDebugEnabled()) {
-// TODO: Fix complex logging format - 							getLog().debug("Reading YAML properties from: {}", yamlFile.toString());
+						if (log.isDebugEnabled()) {
+							log.debug("Reading YAML properties from: {}", yamlFile.toString());
 						}
 						processYaml(yamlFile, dockerEnvVars, jdbcConfigs, ports);
 					}
 				}
 			} else {
-// TODO: Fix complex logging format - 				getLog().warn("Properties directory not found: {}", modulePropertiesDir.toString());
+				log.warn("Properties directory not found: {}", modulePropertiesDir.toString());
 			}
 		}
 		// add profiles setting
@@ -624,11 +637,11 @@ public class DockerComposePlugin extends AbstractMojo {
 		if (!dockerEnvVars.containsKey(SERVER_PORT_PROPERTY) && !dockerEnvVars.containsKey("SERVER_PORT")) {
 			dockerEnvVars.put("server.port", "8080");
 			ports.add("8080");
-			// TODO: Fix complex logging format - Using default port 8080 for service
+			getLog().info("Using default port 8080 for service: {}", serviceName);
 		}
 
-		getLog().info("Service '" + serviceName + "' configured with " + dockerEnvVars.size() + " environment variable(s), " + 
-			ports.size() + " port(s), " + volumeMappings.size() + " volume(s)");
+		getLog().info("Service '{}' configured with {} environment variable(s), {} port(s), {} volume(s)", 
+				serviceName, dockerEnvVars.size(), ports.size(), volumeMappings.size());
 
 		DockerService dockerService = DockerService.builder()
 												   .name(moduleDirectory.getName())
@@ -677,8 +690,8 @@ public class DockerComposePlugin extends AbstractMojo {
 					String value = keyValue[1].trim();
 					dockerEnvVars.put(key, value);
 					
-					// Include server.port in ports only when marked with #DockerInclude
-					if (key.equals(SERVER_PORT_PROPERTY)) {
+					// Include server.port in ports only when marked with DockerInclude
+					if (SERVER_PORT_PROPERTY.equals(key)) {
 						ports.add(value);
 					}
 				}
@@ -774,7 +787,7 @@ public class DockerComposePlugin extends AbstractMojo {
 					jdbcConfigs.put(formattedKey, stringValue);
 				}
 
-				// Check for server.port (for ports mapping)
+				// Always include server.port in ports
 				if (formattedKey.equals(SERVER_PORT_PROPERTY.toUpperCase().replace(".", "_").replace("-", "_"))) {
 					ports.add(stringValue);
 				}
@@ -890,10 +903,10 @@ public class DockerComposePlugin extends AbstractMojo {
 				writer.write(serviceBuffer.toString());
 			}
 		} catch (IOException e) {
-			getLog().error("Error writing .env file: " + e.getMessage());
+			log.error("Error writing .env file: {}", e.getMessage());
 			return false;
 		}
-		getLog().info("Successfully generated environment file: " + environmentFile.toString());
+		getLog().info("Successfully generated environment file: {}", environmentFile.toString());
 		return true;
 	}
 
@@ -909,7 +922,7 @@ public class DockerComposePlugin extends AbstractMojo {
 		File pomFile = new File(moduleDirectory, "pom.xml");
 		
 		if (!pomFile.exists()) {
-// TODO: Fix complex logging format - 			getLog().debug("No pom.xml found in module directory: {}", moduleDirectory.getAbsolutePath());
+			log.debug("No pom.xml found in module directory: {}", moduleDirectory.getAbsolutePath());
 			return moduleVolumes;
 		}
 
@@ -939,7 +952,7 @@ public class DockerComposePlugin extends AbstractMojo {
 				}
 			}
 		} catch (ParserConfigurationException | SAXException | IOException e) {
-// TODO: Fix complex logging format - 			getLog().warn("Failed to parse pom.xml for module {}: {}", moduleDirectory.getName(), e.getMessage());
+			log.warn("Failed to parse pom.xml for module {}: {}", moduleDirectory.getName(), e.getMessage());
 		}
 
 		return moduleVolumes;
@@ -965,7 +978,7 @@ public class DockerComposePlugin extends AbstractMojo {
 				Element volumesElement = (Element) volumesNodes.item(j);
 				NodeList volumeNodes = volumesElement.getElementsByTagName("volume");
 				
-// TODO: Fix complex logging format - 				getLog().debug("Found {} volume configuration(s) in module: {}", volumeNodes.getLength(), moduleName);
+				log.debug("Found {} volume configuration(s) in module: {}", volumeNodes.getLength(), moduleName);
 				
 				for (int k = 0; k < volumeNodes.getLength(); k++) {
 					Element volumeElement = (Element) volumeNodes.item(k);
@@ -989,10 +1002,10 @@ public class DockerComposePlugin extends AbstractMojo {
 						volume.setExternal(external);
 						volume.setInternal(internal);
 						volumes.add(volume);
-// TODO: Fix complex logging format - 						getLog().debug("Parsed volume from module {}: {} -> {}", moduleName, external, internal);
+						log.debug("Parsed volume from module {}: {} -> {}", moduleName, external, internal);
 					} else {
-						getLog().warn("Incomplete volume configuration in module " + moduleName + 
-							": external='" + external + "', internal='" + internal + "'");
+						log.warn("Incomplete volume configuration in module {}: external='{}', internal='{}'", 
+								moduleName, external, internal);
 					}
 				}
 			}

@@ -44,6 +44,9 @@ public class DockerService {
 	
 	@Builder.Default
 	private boolean createEnvironmentFile = false;
+	
+	@Builder.Default
+	private List<VolumeMapping> specificVolumes = new ArrayList<>();
 	/**
 	 * wrapper method calling <code>generateServiceEntry(String commonName, String commonEnvironmentName)</code> with
 	 * null values to indicate no common environment is provided and a service entry for a single module project is 
@@ -65,6 +68,10 @@ public class DockerService {
 	 * @return a string containing the entire service definition for the docker compose file.
 	 */
 	public String generateServiceEntry(String commonName, String commonEnvironmentName) {
+	    return generateServiceEntry(commonName, commonEnvironmentName, false, null);
+	}
+	
+	public String generateServiceEntry(String commonName, String commonEnvironmentName, boolean containsCommonVolumes, String moduleName) {
 	    StringBuilder serviceEntry = new StringBuilder();
 	    serviceEntry.append(StringUtils.repeat(" ", 2))
 	    			.append(name).append(":\n");
@@ -121,6 +128,23 @@ public class DockerService {
 	        								  .append(port).append(":").append(port)
 	        								  .append("\"\n"));
 	    }
+
+	    if (!specificVolumes.isEmpty()) {
+	        serviceEntry.append(StringUtils.repeat(" ", 4))
+	                    .append("volumes:\n");
+	        
+	        // According to requirements: "If the submodule/service itself defines volumes, 
+	        // just add the list of additional volumes and do not use the common-volumes 
+	        // to comply with the rules given by docker compose and yaml."
+	        // This means we need to list all volumes directly, not use merge keys
+	        
+	        // Don't sort volumes to maintain the order (common volumes first, then specific)
+	        specificVolumes.forEach(volume -> serviceEntry.append(StringUtils.repeat(" ", 6))
+	                                                      .append("- ")
+	                                                      .append(volume.getExternal()).append(":")
+	                                                      .append(volume.getInternal()).append("\n"));
+	    }
+
 	    log.info("Generated service entry for " + name);
 	    return serviceEntry.toString();
 	}
